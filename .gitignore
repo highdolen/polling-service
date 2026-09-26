@@ -1,0 +1,33 @@
+:::writing{variant="document" id="61428" title=".gitignore"}
+# Environment
+.env
+
+# Local cookies / test data
+cookies.txt
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Build artifacts
+bin/
+dist/
+build/
+tmp/
+
+# Coverage
+coverage.out
+coverage.html

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админка — опросы</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <main class="container">
+        <section class="card">
+            <h1>Создание опроса</h1>
+
+            <form id="create-poll-form">
+                <label for="admin-token">Admin token</label>
+                <input
+                    type="password"
+                    id="admin-token"
+                    placeholder="Введите ADMIN_TOKEN"
+                    required
+                >
+
+                <label for="poll-question">Вопрос</label>
+                <input
+                    type="text"
+                    id="poll-question"
+                    placeholder="Введите вопрос"
+                    required
+                >
+
+                <label for="poll-type">Тип опроса</label>
+                <select id="poll-type">
+                    <option value="single">Один вариант</option>
+                    <option value="multiple">Несколько вариантов</option>
+                </select>
+
+                <label for="starts-at">Начало (МСК)</label>
+                <input
+                    type="datetime-local"
+                    id="starts-at"
+                    required
+                >
+
+                <label for="ends-at">Окончание (МСК)</label>
+                <input
+                    type="datetime-local"
+                    id="ends-at"
+                    required
+                >
+
+                <label>Варианты ответа</label>
+
+                <div id="options">
+                    <input type="text" class="option-input" placeholder="Вариант 1" required>
+                    <input type="text" class="option-input" placeholder="Вариант 2" required>
+                </div>
+
+                <button type="button" id="add-option">
+                    Добавить вариант
+                </button>
+
+                <button type="submit">
+                    Создать опрос
+                </button>
+            </form>
+
+            <div id="create-message" class="message hidden"></div>
+        </section>
+
+        <section class="card">
+            <h1>Опросы</h1>
+
+            <button id="load-polls">
+                Загрузить опросы
+            </button>
+
+            <div id="polls-list"></div>
+        </section>
+
+        <section class="card">
+            <h1>Результаты</h1>
+
+            <div id="results"></div>
+        </section>
+    </main>
+
+    <script src="/js/admin.js"></script>
+</body>
+</html>
