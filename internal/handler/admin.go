@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"test_task/internal/model"
-	"test_task/internal/service"
+	"polling-service/internal/model"
+	"polling-service/internal/service"
 )
 
 type adminPollService interface {

@@ -3,7 +3,7 @@ package postgres
 import (
 	"context"
 
-	"test_task/internal/model"
+	"polling-service/internal/model"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

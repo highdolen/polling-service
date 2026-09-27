@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"test_task/internal/handler"
-	"test_task/internal/model"
-	"test_task/internal/service"
+	"polling-service/internal/handler"
+	"polling-service/internal/model"
+	"polling-service/internal/service"
 )
 
 func TestPublicHandler_GetPoll_Success(t *testing.T) {

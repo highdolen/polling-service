@@ -3,7 +3,7 @@ package handler_test
 import (
 	"context"
 
-	"test_task/internal/model"
+	"polling-service/internal/model"
 )
 
 type mockPollService struct {

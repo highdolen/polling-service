@@ -9,13 +9,13 @@ import (
 	"syscall"
 	"time"
 
-	"test_task/internal/config"
-	"test_task/internal/handler"
-	"test_task/internal/middleware"
-	"test_task/internal/service"
-	"test_task/internal/storage/postgres"
-	redisstorage "test_task/internal/storage/redis"
-	resultsync "test_task/internal/sync"
+	"polling-service/internal/config"
+	"polling-service/internal/handler"
+	"polling-service/internal/middleware"
+	"polling-service/internal/service"
+	"polling-service/internal/storage/postgres"
+	redisstorage "polling-service/internal/storage/redis"
+	resultsync "polling-service/internal/sync"
 )
 
 func main() {

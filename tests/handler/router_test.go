@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"test_task/internal/handler"
-	"test_task/internal/middleware"
-	"test_task/internal/model"
+	"polling-service/internal/handler"
+	"polling-service/internal/middleware"
+	"polling-service/internal/model"
 )
 
 func TestRouter_PublicGetPoll(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"test_task/internal/model"
+	"polling-service/internal/model"
 )
 
 type pollRepository interface {

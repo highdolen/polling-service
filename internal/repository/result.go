@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"test_task/internal/model"
+	"polling-service/internal/model"
 )
 
 type ResultRepository interface {

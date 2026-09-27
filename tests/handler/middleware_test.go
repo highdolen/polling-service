@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"test_task/internal/middleware"
+	"polling-service/internal/middleware"
 )
 
 func TestAdminAuth_Success(t *testing.T) {

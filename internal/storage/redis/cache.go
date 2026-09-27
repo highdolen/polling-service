@@ -8,8 +8,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"test_task/internal/model"
-	repo "test_task/internal/repository"
+	"polling-service/internal/model"
+	repo "polling-service/internal/repository"
 )
 
 type PollStorage struct {

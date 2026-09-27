@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"test_task/internal/model"
-	"test_task/internal/repository"
+	"polling-service/internal/model"
+	"polling-service/internal/repository"
 )
 
 var (

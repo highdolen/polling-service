@@ -1,4 +1,4 @@
-module test_task
+module polling-service
 
 go 1.25.0
 

@@ -8,8 +8,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"test_task/internal/model"
-	"test_task/internal/repository"
+	"polling-service/internal/model"
+	"polling-service/internal/repository"
 )
 
 type PollRepository struct {

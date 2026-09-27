@@ -3,7 +3,7 @@ package handler
 import (
 	"net/http"
 
-	"test_task/internal/middleware"
+	"polling-service/internal/middleware"
 )
 
 func NewRouter(

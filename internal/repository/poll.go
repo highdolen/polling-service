@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"test_task/internal/model"
+	"polling-service/internal/model"
 )
 
 var (

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"test_task/internal/model"
-	resultsync "test_task/internal/sync"
+	"polling-service/internal/model"
+	resultsync "polling-service/internal/sync"
 )
 
 type mockPollRepository struct {

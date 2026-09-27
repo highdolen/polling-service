@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"test_task/internal/model"
-	postgresstorage "test_task/internal/storage/postgres"
+	"polling-service/internal/model"
+	postgresstorage "polling-service/internal/storage/postgres"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

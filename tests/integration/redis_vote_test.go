@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	pollredis "test_task/internal/storage/redis"
+	pollredis "polling-service/internal/storage/redis"
 
 	goredis "github.com/redis/go-redis/v9"
 )

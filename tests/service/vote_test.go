@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"test_task/internal/model"
-	"test_task/internal/repository"
-	"test_task/internal/service"
+	"polling-service/internal/model"
+	"polling-service/internal/repository"
+	"polling-service/internal/service"
 )
 
 type mockVoteRepository struct {
