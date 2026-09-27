@@ -21,13 +21,16 @@ var (
 
 type PollService struct {
 	polls repository.PollRepository
+	cache repository.PollCache
 }
 
 func NewPollService(
 	polls repository.PollRepository,
+	cache repository.PollCache,
 ) *PollService {
 	return &PollService{
 		polls: polls,
+		cache: cache,
 	}
 }
 
@@ -74,16 +77,16 @@ func (s *PollService) Create(
 		}
 	}
 
-	if err := s.polls.Create(ctx, poll); err != nil {
-		return err
-	}
-
-	for i := range options {
-		options[i].PollID = poll.ID
-
-		if err := s.polls.CreateOption(ctx, &options[i]); err != nil {
-			return err
+	if err := s.polls.CreateWithOptions(
+		ctx,
+		poll,
+		options,
+	); err != nil {
+		if errors.Is(err, repository.ErrPollTimeConflict) {
+			return ErrPollTimeConflict
 		}
+
+		return err
 	}
 
 	return nil
@@ -93,7 +96,18 @@ func (s *PollService) Get(
 	ctx context.Context,
 	id int64,
 ) (*model.Poll, []model.Option, error) {
-	poll, err := s.polls.GetByID(ctx, id)
+	poll, options, err := s.cache.Get(ctx, id)
+	if err == nil {
+		updatePollStatus(poll)
+
+		return poll, options, nil
+	}
+
+	if !errors.Is(err, repository.ErrCacheMiss) {
+		return nil, nil, err
+	}
+
+	poll, err = s.polls.GetByID(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -102,11 +116,24 @@ func (s *PollService) Get(
 		return nil, nil, ErrPollNotFound
 	}
 
-	updatePollStatus(poll)
-
-	options, err := s.polls.GetOptions(ctx, id)
+	options, err = s.polls.GetOptions(ctx, id)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	updatePollStatus(poll)
+
+	ttl := time.Until(poll.EndsAt)
+
+	if ttl > 0 {
+		if err := s.cache.Set(
+			ctx,
+			poll,
+			options,
+			ttl,
+		); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	return poll, options, nil
@@ -115,20 +142,44 @@ func (s *PollService) Get(
 func (s *PollService) GetActive(
 	ctx context.Context,
 ) (*model.Poll, []model.Option, error) {
-	poll, err := s.polls.GetActive(ctx)
+	poll, options, err := s.cache.GetActive(ctx)
+	if err == nil {
+		updatePollStatus(poll)
+
+		return poll, options, nil
+	}
+
+	if !errors.Is(err, repository.ErrCacheMiss) {
+		return nil, nil, err
+	}
+
+	poll, err = s.polls.GetActive(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	if poll == nil {
-		return nil, nil, ErrPollNotFound
+		return nil, nil, nil
 	}
 
-	poll.Status = "active"
-
-	options, err := s.polls.GetOptions(ctx, poll.ID)
+	options, err = s.polls.GetOptions(ctx, poll.ID)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	updatePollStatus(poll)
+
+	ttl := time.Until(poll.EndsAt)
+
+	if ttl > 0 {
+		if err := s.cache.SetActive(
+			ctx,
+			poll,
+			options,
+			ttl,
+		); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	return poll, options, nil

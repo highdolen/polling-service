@@ -304,6 +304,15 @@ func (h *PublicHandler) GetActivePoll(
 		return
 	}
 
+	if poll == nil {
+		http.Error(
+			w,
+			"no active poll",
+			http.StatusNotFound,
+		)
+		return
+	}
+
 	response := struct {
 		ID       int64          `json:"id"`
 		Question string         `json:"question"`

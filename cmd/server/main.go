@@ -32,7 +32,11 @@ func main() {
 	}
 	defer pgPool.Close()
 
-	redisClient, err := redisstorage.New(ctx, cfg.RedisAddr, cfg.RedisDB)
+	redisClient, err := redisstorage.New(
+		ctx,
+		cfg.RedisAddr,
+		cfg.RedisDB,
+	)
 	if err != nil {
 		log.Fatalf("failed to connect to redis: %v", err)
 	}
@@ -43,12 +47,26 @@ func main() {
 	}()
 
 	pollRepository := postgres.NewPollRepository(pgPool)
+	pollCache := redisstorage.NewPollStorage(redisClient)
+
 	voteStorage := redisstorage.NewVoteStorage(redisClient)
 	resultRepository := postgres.NewResultRepository(pgPool)
 
-	pollService := service.NewPollService(pollRepository)
-	voteService := service.NewVoteService(pollRepository, voteStorage)
-	resultService := service.NewResultService(pollRepository, voteStorage)
+	pollService := service.NewPollService(
+		pollRepository,
+		pollCache,
+	)
+
+	voteService := service.NewVoteService(
+		pollRepository,
+		pollCache,
+		voteStorage,
+	)
+
+	resultService := service.NewResultService(
+		pollRepository,
+		voteStorage,
+	)
 
 	resultSync := resultsync.NewResultSync(
 		pollRepository,
@@ -57,10 +75,20 @@ func main() {
 		5*time.Second,
 	)
 
-	publicHandler := handler.NewPublicHandler(pollService, voteService)
-	adminHandler := handler.NewAdminHandler(pollService, resultService)
+	publicHandler := handler.NewPublicHandler(
+		pollService,
+		voteService,
+	)
 
-	rateLimiter := middleware.NewRateLimiter(cfg.RateLimitRPS, time.Second)
+	adminHandler := handler.NewAdminHandler(
+		pollService,
+		resultService,
+	)
+
+	rateLimiter := middleware.NewRateLimiter(
+		cfg.RateLimitRPS,
+		time.Second,
+	)
 
 	router := handler.NewRouter(
 		publicHandler,
@@ -84,6 +112,7 @@ func main() {
 	}()
 
 	go resultSync.Start(ctx)
+
 	waitForShutdown(server)
 }
 

@@ -8,6 +8,8 @@ export const options = {
 };
 
 const BASE_URL = 'http://localhost:8080';
+
+// Укажи ID активного poll и одного из его вариантов.
 const POLL_ID = 3;
 const OPTION_ID = 7;
 
@@ -19,10 +21,13 @@ const status500 = new Counter('status_500');
 const statusOther = new Counter('status_other');
 
 export default function () {
-    const clientID = `loadtest-${__VU}-${__ITER}`;
+    // Один client_id на VU.
+    // Поэтому один виртуальный пользователь пытается
+    // проголосовать повторно на каждой итерации.
+    const clientID = `loadtest-${__VU}`;
 
     const payload = JSON.stringify({
-        option_id: OPTION_ID,
+        option_ids: [OPTION_ID],
     });
 
     const params = {

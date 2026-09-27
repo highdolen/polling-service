@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"test_task/internal/model"
 	"test_task/internal/repository"
 )
 
@@ -21,15 +22,18 @@ var (
 
 type VoteService struct {
 	polls repository.PollRepository
+	cache repository.PollCache
 	votes repository.VoteRepository
 }
 
 func NewVoteService(
 	polls repository.PollRepository,
+	cache repository.PollCache,
 	votes repository.VoteRepository,
 ) *VoteService {
 	return &VoteService{
 		polls: polls,
+		cache: cache,
 		votes: votes,
 	}
 }
@@ -44,7 +48,7 @@ func (s *VoteService) Vote(
 		return ErrNoOptions
 	}
 
-	poll, err := s.polls.GetByID(ctx, pollID)
+	poll, options, err := s.getPoll(ctx, pollID)
 	if err != nil {
 		return err
 	}
@@ -59,12 +63,18 @@ func (s *VoteService) Vote(
 		return ErrPollNotStarted
 	}
 
-	if now.After(poll.EndsAt) {
+	if !now.Before(poll.EndsAt) {
 		return ErrPollFinished
 	}
 
 	if poll.Type == "single" && len(optionIDs) != 1 {
 		return ErrInvalidVoteOptions
+	}
+
+	optionSet := make(map[int64]struct{}, len(options))
+
+	for _, option := range options {
+		optionSet[option.ID] = struct{}{}
 	}
 
 	seen := make(map[int64]struct{}, len(optionIDs))
@@ -78,20 +88,11 @@ func (s *VoteService) Vote(
 			return ErrDuplicateOption
 		}
 
-		seen[optionID] = struct{}{}
-
-		option, err := s.polls.GetOptionByID(
-			ctx,
-			pollID,
-			optionID,
-		)
-		if err != nil {
-			return err
-		}
-
-		if option == nil {
+		if _, exists := optionSet[optionID]; !exists {
 			return ErrOptionNotFound
 		}
+
+		seen[optionID] = struct{}{}
 	}
 
 	ttl := time.Until(poll.EndsAt)
@@ -116,4 +117,47 @@ func (s *VoteService) Vote(
 	}
 
 	return nil
+}
+
+func (s *VoteService) getPoll(
+	ctx context.Context,
+	pollID int64,
+) (*model.Poll, []model.Option, error) {
+	poll, options, err := s.cache.Get(ctx, pollID)
+	if err == nil {
+		return poll, options, nil
+	}
+
+	if !errors.Is(err, repository.ErrCacheMiss) {
+		return nil, nil, err
+	}
+
+	poll, err = s.polls.GetByID(ctx, pollID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if poll == nil {
+		return nil, nil, nil
+	}
+
+	options, err = s.polls.GetOptions(ctx, pollID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ttl := time.Until(poll.EndsAt)
+
+	if ttl > 0 {
+		if err := s.cache.Set(
+			ctx,
+			poll,
+			options,
+			ttl,
+		); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return poll, options, nil
 }

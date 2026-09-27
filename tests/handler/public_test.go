@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -127,6 +128,167 @@ func TestPublicHandler_GetPoll_Success(t *testing.T) {
 		)
 	}
 
+}
+
+func TestPublicHandler_GetActivePoll_Success(t *testing.T) {
+	now := time.Now()
+
+	poll := &model.Poll{
+		ID:       1,
+		Question: "What is your favorite language?",
+		Type:     "single",
+		StartsAt: now.Add(-time.Minute),
+		EndsAt:   now.Add(time.Minute),
+	}
+
+	options := []model.Option{
+		{
+			ID:     1,
+			PollID: 1,
+			Text:   "Go",
+		},
+		{
+			ID:     2,
+			PollID: 1,
+			Text:   "Python",
+		},
+	}
+
+	pollService := &mockPollService{
+		poll:    poll,
+		options: options,
+	}
+
+	voteService := &mockVoteService{}
+
+	handler := handler.NewPublicHandler(
+		pollService,
+		voteService,
+	)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/polls/active",
+		nil,
+	)
+
+	rec := httptest.NewRecorder()
+
+	handler.GetActivePoll(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	var response struct {
+		ID       int64          `json:"id"`
+		Question string         `json:"question"`
+		Type     string         `json:"type"`
+		Options  []model.Option `json:"options"`
+	}
+
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if response.ID != 1 {
+		t.Fatalf("expected poll ID 1, got %d", response.ID)
+	}
+
+	if response.Question != poll.Question {
+		t.Fatalf(
+			"expected question %q, got %q",
+			poll.Question,
+			response.Question,
+		)
+	}
+
+	if response.Type != poll.Type {
+		t.Fatalf(
+			"expected type %q, got %q",
+			poll.Type,
+			response.Type,
+		)
+	}
+
+	if len(response.Options) != 2 {
+		t.Fatalf(
+			"expected 2 options, got %d",
+			len(response.Options),
+		)
+	}
+
+	if response.Options[0].Text != "Go" {
+		t.Fatalf(
+			"expected first option %q, got %q",
+			"Go",
+			response.Options[0].Text,
+		)
+	}
+}
+
+func TestPublicHandler_GetActivePoll_NotFound(t *testing.T) {
+	pollService := &mockPollService{
+		poll:    nil,
+		options: nil,
+		err:     nil,
+	}
+
+	voteService := &mockVoteService{}
+
+	handler := handler.NewPublicHandler(
+		pollService,
+		voteService,
+	)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/polls/active",
+		nil,
+	)
+
+	rec := httptest.NewRecorder()
+
+	handler.GetActivePoll(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusNotFound,
+			rec.Code,
+		)
+	}
+}
+
+func TestPublicHandler_GetActivePoll_RepositoryError(t *testing.T) {
+	pollService := &mockPollService{
+		err: errors.New("database error"),
+	}
+
+	voteService := &mockVoteService{}
+
+	handler := handler.NewPublicHandler(
+		pollService,
+		voteService,
+	)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/polls/active",
+		nil,
+	)
+
+	rec := httptest.NewRecorder()
+
+	handler.GetActivePoll(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusInternalServerError,
+			rec.Code,
+		)
+	}
 }
 
 func TestPublicHandler_GetPoll_NotFound(t *testing.T) {

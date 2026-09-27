@@ -6,13 +6,117 @@ import (
 	"time"
 
 	"test_task/internal/model"
+	"test_task/internal/repository"
 	"test_task/internal/service"
 )
 
+type mockPollCache struct {
+	polls map[int64]cachedPoll
+}
+
+type cachedPoll struct {
+	poll    model.Poll
+	options []model.Option
+}
+
+func newMockPollCache() *mockPollCache {
+	return &mockPollCache{
+		polls: make(map[int64]cachedPoll),
+	}
+}
+
+func (m *mockPollCache) Set(
+	ctx context.Context,
+	poll *model.Poll,
+	options []model.Option,
+	ttl time.Duration,
+) error {
+	m.polls[poll.ID] = cachedPoll{
+		poll:    *poll,
+		options: options,
+	}
+
+	return nil
+}
+
+func (m *mockPollCache) Get(
+	ctx context.Context,
+	pollID int64,
+) (*model.Poll, []model.Option, error) {
+	cached, ok := m.polls[pollID]
+	if !ok {
+		return nil, nil, repository.ErrCacheMiss
+	}
+
+	return &cached.poll, cached.options, nil
+}
+
+func (m *mockPollCache) Delete(
+	ctx context.Context,
+	pollID int64,
+) error {
+	delete(m.polls, pollID)
+
+	return nil
+}
+
+func (m *mockPollCache) GetActive(
+	ctx context.Context,
+) (*model.Poll, []model.Option, error) {
+	for _, cached := range m.polls {
+		if cached.poll.Status == "active" {
+			return &cached.poll, cached.options, nil
+		}
+	}
+
+	return nil, nil, repository.ErrCacheMiss
+}
+
+func (m *mockPollCache) SetActive(
+	ctx context.Context,
+	poll *model.Poll,
+	options []model.Option,
+	ttl time.Duration,
+) error {
+	m.polls[poll.ID] = cachedPoll{
+		poll:    *poll,
+		options: options,
+	}
+
+	return nil
+}
+
+// CreateWithOptions добавляет poll и все его options в mock repository.
+func (m *mockPollRepository) CreateWithOptions(
+	ctx context.Context,
+	poll *model.Poll,
+	options []model.Option,
+) error {
+	poll.ID = int64(len(m.polls) + 1)
+
+	m.polls[poll.ID] = poll
+
+	for i := range options {
+		options[i].ID = int64(len(m.options[poll.ID]) + 1)
+		options[i].PollID = poll.ID
+
+		m.options[poll.ID] = append(
+			m.options[poll.ID],
+			options[i],
+		)
+	}
+
+	return nil
+}
+
 func TestPollService_Create(t *testing.T) {
 	repo := newMockPollRepository()
+	cache := newMockPollCache()
 
-	pollService := service.NewPollService(repo)
+	pollService := service.NewPollService(
+		repo,
+		cache,
+	)
 
 	poll := &model.Poll{
 		Question: "Какой язык программирования вам нравится?",
@@ -58,8 +162,12 @@ func TestPollService_Create(t *testing.T) {
 
 func TestPollService_Create_EmptyQuestion(t *testing.T) {
 	repo := newMockPollRepository()
+	cache := newMockPollCache()
 
-	pollService := service.NewPollService(repo)
+	pollService := service.NewPollService(
+		repo,
+		cache,
+	)
 
 	poll := &model.Poll{
 		Question: "",
@@ -93,8 +201,12 @@ func TestPollService_Create_EmptyQuestion(t *testing.T) {
 
 func TestPollService_Create_NotEnoughOptions(t *testing.T) {
 	repo := newMockPollRepository()
+	cache := newMockPollCache()
 
-	pollService := service.NewPollService(repo)
+	pollService := service.NewPollService(
+		repo,
+		cache,
+	)
 
 	poll := &model.Poll{
 		Question: "Выберите вариант",
@@ -125,8 +237,12 @@ func TestPollService_Create_NotEnoughOptions(t *testing.T) {
 
 func TestPollService_Create_EmptyOption(t *testing.T) {
 	repo := newMockPollRepository()
+	cache := newMockPollCache()
 
-	pollService := service.NewPollService(repo)
+	pollService := service.NewPollService(
+		repo,
+		cache,
+	)
 
 	poll := &model.Poll{
 		Question: "Выберите вариант",
@@ -160,8 +276,12 @@ func TestPollService_Create_EmptyOption(t *testing.T) {
 
 func TestPollService_Create_InvalidTime(t *testing.T) {
 	repo := newMockPollRepository()
+	cache := newMockPollCache()
 
-	pollService := service.NewPollService(repo)
+	pollService := service.NewPollService(
+		repo,
+		cache,
+	)
 
 	now := time.Now()
 
@@ -195,8 +315,123 @@ func TestPollService_Create_InvalidTime(t *testing.T) {
 	}
 }
 
+func TestPollService_Create_PollTimeConflict(t *testing.T) {
+	repo := newMockPollRepository()
+	cache := newMockPollCache()
+
+	pollService := service.NewPollService(
+		repo,
+		cache,
+	)
+
+	now := time.Now()
+
+	firstPoll := &model.Poll{
+		Question: "Первый опрос",
+		Type:     "single",
+		StartsAt: now,
+		EndsAt:   now.Add(10 * time.Minute),
+	}
+
+	options := []model.Option{
+		{
+			Text: "Да",
+		},
+		{
+			Text: "Нет",
+		},
+	}
+
+	err := pollService.Create(
+		context.Background(),
+		firstPoll,
+		options,
+	)
+	if err != nil {
+		t.Fatalf("expected no error for first poll, got %v", err)
+	}
+
+	secondPoll := &model.Poll{
+		Question: "Второй опрос",
+		Type:     "single",
+		StartsAt: now.Add(5 * time.Minute),
+		EndsAt:   now.Add(15 * time.Minute),
+	}
+
+	err = pollService.Create(
+		context.Background(),
+		secondPoll,
+		options,
+	)
+
+	if err != service.ErrPollTimeConflict {
+		t.Fatalf(
+			"expected ErrPollTimeConflict, got %v",
+			err,
+		)
+	}
+}
+
+func TestPollService_Create_AdjacentPolls(t *testing.T) {
+	repo := newMockPollRepository()
+	cache := newMockPollCache()
+
+	pollService := service.NewPollService(
+		repo,
+		cache,
+	)
+
+	now := time.Now()
+
+	firstPoll := &model.Poll{
+		Question: "Первый опрос",
+		Type:     "single",
+		StartsAt: now,
+		EndsAt:   now.Add(10 * time.Minute),
+	}
+
+	options := []model.Option{
+		{
+			Text: "Да",
+		},
+		{
+			Text: "Нет",
+		},
+	}
+
+	err := pollService.Create(
+		context.Background(),
+		firstPoll,
+		options,
+	)
+	if err != nil {
+		t.Fatalf("expected no error for first poll, got %v", err)
+	}
+
+	secondPoll := &model.Poll{
+		Question: "Второй опрос",
+		Type:     "single",
+		StartsAt: now.Add(10 * time.Minute),
+		EndsAt:   now.Add(20 * time.Minute),
+	}
+
+	err = pollService.Create(
+		context.Background(),
+		secondPoll,
+		options,
+	)
+
+	if err != nil {
+		t.Fatalf(
+			"expected adjacent polls to be allowed, got %v",
+			err,
+		)
+	}
+}
+
 func TestPollService_Get(t *testing.T) {
 	repo := newMockPollRepository()
+	cache := newMockPollCache()
 
 	poll := &model.Poll{
 		ID:       1,
@@ -222,7 +457,10 @@ func TestPollService_Get(t *testing.T) {
 		},
 	}
 
-	pollService := service.NewPollService(repo)
+	pollService := service.NewPollService(
+		repo,
+		cache,
+	)
 
 	gotPoll, gotOptions, err := pollService.Get(
 		context.Background(),
@@ -258,12 +496,20 @@ func TestPollService_Get(t *testing.T) {
 			len(gotOptions),
 		)
 	}
+
+	if _, ok := cache.polls[1]; !ok {
+		t.Fatal("expected poll to be saved in cache")
+	}
 }
 
 func TestPollService_Get_NotFound(t *testing.T) {
 	repo := newMockPollRepository()
+	cache := newMockPollCache()
 
-	pollService := service.NewPollService(repo)
+	pollService := service.NewPollService(
+		repo,
+		cache,
+	)
 
 	_, _, err := pollService.Get(
 		context.Background(),

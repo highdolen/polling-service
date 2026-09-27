@@ -596,3 +596,159 @@ func TestAdminHandler_GetResults_RepositoryError(t *testing.T) {
 		)
 	}
 }
+
+func TestAdminHandler_CreatePoll_InvalidOptions(t *testing.T) {
+	pollService := &mockAdminPollService{
+		err: service.ErrInvalidOptions,
+	}
+
+	resultService := &mockAdminResultService{}
+
+	handler := handler.NewAdminHandler(
+		pollService,
+		resultService,
+	)
+
+	body := `{
+		"question": "Test question",
+		"type": "single",
+		"starts_at": "2026-09-27T12:00:00Z",
+		"ends_at": "2026-09-27T13:00:00Z",
+		"options": ["Yes"]
+	}`
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/admin/polls",
+		strings.NewReader(body),
+	)
+
+	rec := httptest.NewRecorder()
+
+	handler.CreatePoll(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusBadRequest,
+			rec.Code,
+		)
+	}
+}
+
+func TestAdminHandler_CreatePoll_InvalidOption(t *testing.T) {
+	pollService := &mockAdminPollService{
+		err: service.ErrInvalidOption,
+	}
+
+	resultService := &mockAdminResultService{}
+
+	handler := handler.NewAdminHandler(
+		pollService,
+		resultService,
+	)
+
+	body := `{
+		"question": "Test question",
+		"type": "single",
+		"starts_at": "2026-09-27T12:00:00Z",
+		"ends_at": "2026-09-27T13:00:00Z",
+		"options": ["Yes", ""]
+	}`
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/admin/polls",
+		strings.NewReader(body),
+	)
+
+	rec := httptest.NewRecorder()
+
+	handler.CreatePoll(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusBadRequest,
+			rec.Code,
+		)
+	}
+}
+
+func TestAdminHandler_CreatePoll_InvalidPollTime(t *testing.T) {
+	pollService := &mockAdminPollService{
+		err: service.ErrInvalidPollTime,
+	}
+
+	resultService := &mockAdminResultService{}
+
+	handler := handler.NewAdminHandler(
+		pollService,
+		resultService,
+	)
+
+	body := `{
+		"question": "Test question",
+		"type": "single",
+		"starts_at": "2026-09-27T13:00:00Z",
+		"ends_at": "2026-09-27T12:00:00Z",
+		"options": ["Yes", "No"]
+	}`
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/admin/polls",
+		strings.NewReader(body),
+	)
+
+	rec := httptest.NewRecorder()
+
+	handler.CreatePoll(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusBadRequest,
+			rec.Code,
+		)
+	}
+}
+
+func TestAdminHandler_CreatePoll_PollTimeConflict(t *testing.T) {
+	pollService := &mockAdminPollService{
+		err: service.ErrPollTimeConflict,
+	}
+
+	resultService := &mockAdminResultService{}
+
+	handler := handler.NewAdminHandler(
+		pollService,
+		resultService,
+	)
+
+	body := `{
+		"question": "Test question",
+		"type": "single",
+		"starts_at": "2026-09-27T12:00:00Z",
+		"ends_at": "2026-09-27T13:00:00Z",
+		"options": ["Yes", "No"]
+	}`
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/admin/polls",
+		strings.NewReader(body),
+	)
+
+	rec := httptest.NewRecorder()
+
+	handler.CreatePoll(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusConflict,
+			rec.Code,
+		)
+	}
+}

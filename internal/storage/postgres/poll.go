@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"test_task/internal/model"
+	"test_task/internal/repository"
 )
 
 type PollRepository struct {
@@ -48,7 +50,10 @@ func (r *PollRepository) Create(ctx context.Context, poll *model.Poll) error {
 	)
 }
 
-func (r *PollRepository) GetByID(ctx context.Context, id int64) (*model.Poll, error) {
+func (r *PollRepository) GetByID(
+	ctx context.Context,
+	id int64,
+) (*model.Poll, error) {
 	query := `
 		SELECT
 			id,
@@ -86,7 +91,9 @@ func (r *PollRepository) GetByID(ctx context.Context, id int64) (*model.Poll, er
 	return &poll, nil
 }
 
-func (r *PollRepository) List(ctx context.Context) ([]model.Poll, error) {
+func (r *PollRepository) List(
+	ctx context.Context,
+) ([]model.Poll, error) {
 	query := `
 		SELECT
 			id,
@@ -135,7 +142,10 @@ func (r *PollRepository) List(ctx context.Context) ([]model.Poll, error) {
 	return polls, nil
 }
 
-func (r *PollRepository) CreateOption(ctx context.Context, option *model.Option) error {
+func (r *PollRepository) CreateOption(
+	ctx context.Context,
+	option *model.Option,
+) error {
 	query := `
 		INSERT INTO poll_options (
 			poll_id,
@@ -153,7 +163,86 @@ func (r *PollRepository) CreateOption(ctx context.Context, option *model.Option)
 	).Scan(&option.ID)
 }
 
-func (r *PollRepository) GetOptions(ctx context.Context, pollID int64) ([]model.Option, error) {
+func (r *PollRepository) CreateWithOptions(
+	ctx context.Context,
+	poll *model.Poll,
+	options []model.Option,
+) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	const pollQuery = `
+		INSERT INTO polls (
+			question,
+			type,
+			status,
+			starts_at,
+			ends_at
+		)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, created_at, updated_at
+	`
+
+	err = tx.QueryRow(
+		ctx,
+		pollQuery,
+		poll.Question,
+		poll.Type,
+		poll.Status,
+		poll.StartsAt,
+		poll.EndsAt,
+	).Scan(
+		&poll.ID,
+		&poll.CreatedAt,
+		&poll.UpdatedAt,
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+
+		if errors.As(err, &pgErr) &&
+			pgErr.ConstraintName == "polls_no_overlap" {
+			return repository.ErrPollTimeConflict
+		}
+
+		return err
+	}
+
+	const optionQuery = `
+		INSERT INTO poll_options (
+			poll_id,
+			text
+		)
+		VALUES ($1, $2)
+		RETURNING id
+	`
+
+	for i := range options {
+		options[i].PollID = poll.ID
+
+		err := tx.QueryRow(
+			ctx,
+			optionQuery,
+			options[i].PollID,
+			options[i].Text,
+		).Scan(&options[i].ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (r *PollRepository) GetOptions(
+	ctx context.Context,
+	pollID int64,
+) ([]model.Option, error) {
 	query := `
 		SELECT
 			id,
@@ -231,7 +320,9 @@ func (r *PollRepository) GetOptionByID(
 	return &option, nil
 }
 
-func (r *PollRepository) GetActive(ctx context.Context) (*model.Poll, error) {
+func (r *PollRepository) GetActive(
+	ctx context.Context,
+) (*model.Poll, error) {
 	const query = `
 		SELECT
 			id,

@@ -15,5 +15,10 @@ CREATE TABLE polls (
         CHECK (type IN ('single', 'multiple')),
 
     CONSTRAINT polls_status_check
-        CHECK (status IN ('draft', 'active', 'finished'))
+        CHECK (status IN ('draft', 'active', 'finished')),
+
+    CONSTRAINT polls_no_overlap
+        EXCLUDE USING gist (
+            tstzrange(starts_at, ends_at, '[)') WITH &&
+        )
 );

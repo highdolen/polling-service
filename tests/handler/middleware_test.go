@@ -289,3 +289,115 @@ func TestRateLimiter_AllowsAfterWindow(t *testing.T) {
 		)
 	}
 }
+
+func TestRateLimiter_UsesXRealIP(t *testing.T) {
+	rateLimiter := middleware.NewRateLimiter(
+		1,
+		time.Minute,
+	)
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := rateLimiter.Middleware(next)
+
+	req1 := httptest.NewRequest(
+		http.MethodGet,
+		"/",
+		nil,
+	)
+	req1.RemoteAddr = "10.0.0.1:1234"
+	req1.Header.Set("X-Real-IP", "192.168.1.10")
+
+	rec1 := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec1, req1)
+
+	if rec1.Code != http.StatusOK {
+		t.Fatalf(
+			"expected first request status %d, got %d",
+			http.StatusOK,
+			rec1.Code,
+		)
+	}
+
+	req2 := httptest.NewRequest(
+		http.MethodGet,
+		"/",
+		nil,
+	)
+	req2.RemoteAddr = "10.0.0.2:1234"
+	req2.Header.Set("X-Real-IP", "192.168.1.10")
+
+	rec2 := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec2, req2)
+
+	if rec2.Code != http.StatusTooManyRequests {
+		t.Fatalf(
+			"expected second request status %d, got %d",
+			http.StatusTooManyRequests,
+			rec2.Code,
+		)
+	}
+}
+
+func TestRateLimiter_UsesXForwardedFor(t *testing.T) {
+	rateLimiter := middleware.NewRateLimiter(
+		1,
+		time.Minute,
+	)
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := rateLimiter.Middleware(next)
+
+	req1 := httptest.NewRequest(
+		http.MethodGet,
+		"/",
+		nil,
+	)
+	req1.RemoteAddr = "10.0.0.1:1234"
+	req1.Header.Set(
+		"X-Forwarded-For",
+		"192.168.1.20, 10.0.0.2",
+	)
+
+	rec1 := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec1, req1)
+
+	if rec1.Code != http.StatusOK {
+		t.Fatalf(
+			"expected first request status %d, got %d",
+			http.StatusOK,
+			rec1.Code,
+		)
+	}
+
+	req2 := httptest.NewRequest(
+		http.MethodGet,
+		"/",
+		nil,
+	)
+	req2.RemoteAddr = "10.0.0.3:1234"
+	req2.Header.Set(
+		"X-Forwarded-For",
+		"192.168.1.20, 10.0.0.4",
+	)
+
+	rec2 := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec2, req2)
+
+	if rec2.Code != http.StatusTooManyRequests {
+		t.Fatalf(
+			"expected second request status %d, got %d",
+			http.StatusTooManyRequests,
+			rec2.Code,
+		)
+	}
+}
